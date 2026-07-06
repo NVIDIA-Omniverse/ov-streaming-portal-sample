@@ -22,7 +22,7 @@
  */
 
 import { IconCircleFilled } from "@tabler/icons-react";
-import { Flex, Text, Tooltip } from "@mantine/core";
+import { Flex, Group, HoverCard, Stack, Text } from "@mantine/core";
 import { CSSProperties } from "react";
 
 export interface StreamLatencyIndicatorProps {
@@ -31,11 +31,23 @@ export interface StreamLatencyIndicatorProps {
    */
   rtd: number;
 
+  /**
+   * Total packet loss.
+   */
+  packetLoss: number;
+
+  /**
+   * Packets lost in the last 3 minutes.
+   */
+  recentPacketLoss: number;
+
   style?: CSSProperties;
 }
 
 export function StreamLatencyIndicator({
   rtd,
+  packetLoss,
+  recentPacketLoss,
   style,
 }: StreamLatencyIndicatorProps) {
   if (!rtd) {
@@ -46,9 +58,36 @@ export function StreamLatencyIndicator({
   return (
     <Flex style={style} align={"center"} gap={"xs"}>
       <Text size={"xs"}>Connection Latency:</Text>
-      <Tooltip label={`${rtd}ms`} withArrow>
-        <IconCircleFilled color={color} size={16} />
-      </Tooltip>
+      <HoverCard position={"top"} withArrow shadow={"md"} openDelay={0}>
+        <HoverCard.Target>
+          <IconCircleFilled color={color} size={16} />
+        </HoverCard.Target>
+        <HoverCard.Dropdown>
+          <Stack gap={4}>
+            <Text size={"sm"} fw={600}>
+              Connection Stats
+            </Text>
+            <Group justify={"space-between"} gap={"lg"}>
+              <Text size={"xs"} c={"dimmed"}>
+                Round trip delay
+              </Text>
+              <Text size={"xs"}>{rtd}ms</Text>
+            </Group>
+            <Group justify={"space-between"} gap={"lg"}>
+              <Text size={"xs"} c={"dimmed"}>
+                Packets lost (last 3 min)
+              </Text>
+              <Text size={"xs"}>{recentPacketLoss}</Text>
+            </Group>
+            <Group justify={"space-between"} gap={"lg"}>
+              <Text size={"xs"} c={"dimmed"}>
+                Packets lost (total)
+              </Text>
+              <Text size={"xs"}>{packetLoss}</Text>
+            </Group>
+          </Stack>
+        </HoverCard.Dropdown>
+      </HoverCard>
     </Flex>
   );
 }

@@ -21,7 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-import { ActionIcon, Box, Flex, Loader, Stack } from "@mantine/core";
+import { ActionIcon, Box, Checkbox, Flex, Loader, Stack } from "@mantine/core";
 import { useDisclosure, useDocumentTitle } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import useNucleusSession from "@omniverse/auth/react/hooks/NucleusSession";
@@ -160,7 +160,7 @@ interface StreamSessionProps {
 function AppStreamSession({ app, payload, resolution, sessionId }: StreamSessionProps) {
   const navigate = useNavigate();
 
-  const [rtd, recordRtd, resetRtd] = useLatencyIndicator();
+  const [latency, recordLatency, resetLatency] = useLatencyIndicator();
   const { handleCustomEvent } = useStreamStorageApi();
 
   const stream = useStream({
@@ -168,9 +168,9 @@ function AppStreamSession({ app, payload, resolution, sessionId }: StreamSession
     payload,
     resolution,
     sessionId,
-    onStreamStats: recordRtd,
+    onStreamStats: recordLatency,
     onCustomEvent: (message) => void handleCustomEvent(message),
-    onStreamEnd: resetRtd,
+    onStreamEnd: resetLatency,
   });
   const streamStart = useStreamStart(app.id, payload);
   useStreamEndNotification(sessionId);
@@ -244,11 +244,35 @@ function AppStreamSession({ app, payload, resolution, sessionId }: StreamSession
         <Flex
           bg={"black.0"}
           p={"xs"}
+          align={"center"}
           justify={"end"}
           gap={"xl"}
           style={{ borderTop: "1px solid #222" }}
         >
-          <StreamLatencyIndicator rtd={rtd} style={{ marginRight: "auto" }} />
+          <StreamLatencyIndicator
+            rtd={latency.rtd}
+            packetLoss={latency.packetLoss}
+            recentPacketLoss={latency.recentPacketLoss}
+            style={{ marginRight: "auto" }}
+          />
+
+          {stream.allowDynamicResize && (
+            <Checkbox
+              size={"xs"}
+              color={"gray"}
+              label={"Fit to browser"}
+              checked={stream.fitStreamResolution}
+              onChange={(event) =>
+                stream.setFitStreamResolution(event.currentTarget.checked)
+              }
+              styles={{
+                label: {
+                  color: "var(--mantine-color-gray-5)",
+                  paddingInlineStart: 6,
+                },
+              }}
+            />
+          )}
 
           <ActionIcon
             variant={"transparent"}

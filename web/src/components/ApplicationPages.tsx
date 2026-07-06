@@ -48,7 +48,7 @@ export default function ApplicationPages({
           className={classes.applicationPage}
           color={"gray"}
           label={page}
-          to={{ search: `?page=${page}` }}
+          to={{ search: `?page=${encodeURIComponent(page)}` }}
           title={page}
         />
       ))}

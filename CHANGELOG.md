@@ -1,4 +1,15 @@
-# Omniverse on DGX Cloud - Portal Sample Changelog
+# Omniverse Streaming Portal Sample Changelog
+
+## Version 1.6.0 - July 2026
+
+- Renamed to Omniverse Streaming Portal Sample to reflect its expanded compatibility with Omniverse Streaming Self-Hosted.
+- Include sample NavVis integration files
+- Encode page name in the sidebar link to fix pages with plus (+) sign character
+- Show packet loss in stream latency indicator popup
+- Update `@nvidia/ov-web-rtc` (previously known as `@nvidia/web-streaming-library`) to version 6.6.0
+- Added functionality (checkbox) for a stream to automatically fit to the current browser dimensions
+- Add fit-to-browser resize toggle
+- Add recent packet loss metric to stream connection stats
 
 ## Version 1.5.1 - June 2026
 

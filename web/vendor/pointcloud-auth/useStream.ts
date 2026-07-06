@@ -80,6 +80,78 @@ export interface UseStreamResult {
   setFitStreamResolution: (enabled: boolean) => void;
 }
 
+// Type definitions for Potree2 messages
+interface Potree2Message {
+  event_type: string;
+  payload: unknown;
+}
+
+interface Potree2OpenUrlPayload {
+  url: string;
+}
+
+interface Potree2StoreDataPayload {
+  key: string;
+  value: unknown;
+  expiration_time: number;
+}
+
+interface Potree2GetDataPayload {
+  key: string;
+}
+
+interface Potree2GetDataResultPayload {
+  [k: string]: unknown;
+  key: string;
+  value: unknown;
+}
+
+function isPotree2Message(message: unknown): message is Potree2Message {
+  return (
+    typeof message === "object" &&
+    message !== null &&
+    "event_type" in message &&
+    "payload" in message &&
+    typeof (message as Potree2Message).event_type === "string"
+  );
+}
+
+function isPotree2OpenUrlPayload(
+  payload: unknown,
+): payload is Potree2OpenUrlPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "url" in payload &&
+    typeof (payload as Potree2OpenUrlPayload).url === "string"
+  );
+}
+
+function isPotree2StoreDataPayload(
+  payload: unknown,
+): payload is Potree2StoreDataPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "key" in payload &&
+    "value" in payload &&
+    "expiration_time" in payload &&
+    typeof (payload as Potree2StoreDataPayload).key === "string" &&
+    typeof (payload as Potree2StoreDataPayload).expiration_time === "number"
+  );
+}
+
+function isPotree2GetDataPayload(
+  payload: unknown,
+): payload is Potree2GetDataPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "key" in payload &&
+    typeof (payload as Potree2GetDataPayload).key === "string"
+  );
+}
+
 export default function useStream({
   app,
   payload,
@@ -185,8 +257,184 @@ export default function useStream({
       callbacks.current.onStreamStats?.(message);
     }
 
+    // Prefix used for local storage items specific to the omni.pointcloud.potree2 extension
+    const POTREE2_STORAGE_PREFIX: string = "omni.pointcloud.potree2:";
+
+    // Removes expired local storage items that were received from the omni.pointcloud.potree2
+    // extension. When "clear_all" is true, all those items will be remove, independent of their
+    // expiration status.
+    function expirePotree2Storage(clear_all: boolean = false): void {
+      // Retrieve all keys that have the prefix
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key != null && key.startsWith(POTREE2_STORAGE_PREFIX)) {
+          keys.push(key);
+        }
+      }
+
+      for (const key of keys) {
+        if (clear_all) {
+          console.info("Removing storage entry '" + key + "'");
+          localStorage.removeItem(key);
+        } else {
+          const data_json = localStorage.getItem(key);
+          if (data_json != null) {
+            const data = JSON.parse(data_json);
+            if (
+              typeof data === "object" &&
+              data !== null &&
+              "expiration_time" in data
+            ) {
+              const now = Date.now() / 1000; // seconds since epoch
+              if (
+                typeof data.expiration_time === "number" &&
+                now >= data.expiration_time
+              ) {
+                console.info("Removing expired storage entry '" + key + "'");
+                localStorage.removeItem(key);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Handles messages sent by the omni.pointcloud.potree2 extension.
+    // Returns true is the message was processed, false otherwise.
+    function handlePotree2Event(message: unknown): boolean {
+      if (!isPotree2Message(message)) {
+        return false;
+      }
+
+      // open_url: Open the requested URL in a new browser tab.
+      // Note: This may trigger the browser's pop-up blocker under certain conditions.
+      if (message.event_type === "omni.pointcloud.potree2@open_url") {
+        if (isPotree2OpenUrlPayload(message.payload)) {
+          const url = message.payload.url;
+          console.info(message.event_type + ": Opening URL in new tab:", url);
+          window.open(url, "_blank");
+        }
+        return true;
+      }
+
+      // ping: Answer with "ping_result", letting Kit know that a client is connected.
+      if (message.event_type === "omni.pointcloud.potree2@ping") {
+        const answer = {
+          event_type: message.event_type + "_result",
+          payload: { result: true },
+        };
+        console.info(message.event_type + ": Sending answer.");
+        AppStreamer.sendMessage(answer);
+        return true;
+      }
+
+      // store_data: Store the received value in the browser's local storage.
+      // Expiration will be handled by expirePotree2Storage().
+      //
+      // Note: Instead of using local storage here, the data could also be passed on to another web
+      // service for storage.
+      if (message.event_type === "omni.pointcloud.potree2@store_data") {
+        if (isPotree2StoreDataPayload(message.payload)) {
+          let key = message.payload.key;
+          if (key != "") {
+            const data = {
+              value: message.payload.value,
+              expiration_time: message.payload.expiration_time,
+            };
+            localStorage.setItem(
+              POTREE2_STORAGE_PREFIX + key,
+              JSON.stringify(data),
+            );
+            console.info(
+              message.event_type +
+                ": Stored data for key '" +
+                POTREE2_STORAGE_PREFIX +
+                key +
+                "'",
+            );
+          }
+        }
+        return true;
+      }
+
+      // get_data: Return data from local storage that was previously sent with "store_data".
+      // Answer with "get_data_result" and the retrieved value.
+      if (message.event_type === "omni.pointcloud.potree2@get_data") {
+        // Remove expired items
+        expirePotree2Storage();
+
+        if (isPotree2GetDataPayload(message.payload)) {
+          let key = message.payload.key;
+          if (key != "") {
+            const data_json = localStorage.getItem(
+              POTREE2_STORAGE_PREFIX + key,
+            );
+            let value: unknown = null;
+
+            if (data_json != null) {
+              const data = JSON.parse(data_json);
+              if (
+                typeof data === "object" &&
+                data !== null &&
+                "value" in data
+              ) {
+                // Valid item was found
+                value = (data as { value: unknown }).value;
+
+                // Check its expiration again
+                if ("expiration_time" in data) {
+                  const now = Date.now() / 1000; // seconds since epoch
+                  if (
+                    typeof data.expiration_time === "number" &&
+                    now >= data.expiration_time
+                  ) {
+                    console.info(
+                      message.event_type +
+                        ": Requested storage entry is expired",
+                    );
+                    localStorage.removeItem(POTREE2_STORAGE_PREFIX + key);
+                    value = null;
+                  }
+                }
+              }
+            }
+
+            // Prepare answer; value will be null if no stored item was found
+            const answer: {
+              event_type: string;
+              payload: Potree2GetDataResultPayload;
+            } = {
+              event_type: message.event_type + "_result",
+              payload: { key: key, value: value },
+            };
+            console.info(
+              message.event_type +
+                ": Sending " +
+                (value == null ? "empty " : "") +
+                "answer for key '" +
+                POTREE2_STORAGE_PREFIX +
+                key +
+                "'",
+            );
+            AppStreamer.sendMessage(answer);
+          }
+        }
+        return true;
+      }
+
+      return false;
+    }
+
     function onCustomEvent(message: unknown) {
       console.log("onCustomEvent", message);
+
+      // First, try to handle as Potree2 event
+      if (handlePotree2Event(message)) {
+        return;
+      }
+
+      // If not handled by Potree2, pass to external callback
       callbacks.current.onCustomEvent?.(message);
     }
 

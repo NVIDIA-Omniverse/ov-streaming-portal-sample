@@ -21,21 +21,87 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { StatsEvent } from "@nvidia/ov-web-rtc";
 
+const PACKET_LOSS_WINDOW_MS = 3 * 60 * 1000;
+
+export interface LatencyStats {
+  /**
+   * Round trip delay in milliseconds.
+   */
+  rtd: number;
+
+  /**
+   * Total packet loss.
+   */
+  packetLoss: number;
+
+  /**
+   * Packets lost in the last 3 minutes.
+   */
+  recentPacketLoss: number;
+}
+
+interface PacketLossSample {
+  time: number;
+  lost: number;
+}
+
+const EMPTY_STATS: LatencyStats = {
+  rtd: 0,
+  packetLoss: 0,
+  recentPacketLoss: 0,
+};
+
 export function useLatencyIndicator() {
-  const [rtd, setRtd] = useState(0);
+  const [stats, setStats] = useState<LatencyStats>(EMPTY_STATS);
+  const samplesRef = useRef<PacketLossSample[]>([]);
+  const lastPacketLossRef = useRef<number | null>(null);
 
-  const recordRtd = useCallback((event: StatsEvent) => {
-    if (event.data?.stats) {
-      setRtd(event.data.stats.rtd);
+  const recordStats = useCallback((event: StatsEvent) => {
+    const nextStats = event.data?.stats;
+    if (!nextStats) {
+      return;
     }
+
+    const { rtd, packetLoss } = nextStats;
+    const now = Date.now();
+    const previousPacketLoss = lastPacketLossRef.current;
+    lastPacketLossRef.current = packetLoss;
+
+    const lostSinceLast =
+      previousPacketLoss === null
+        ? 0
+        : Math.max(0, packetLoss - previousPacketLoss);
+
+    const samples = samplesRef.current;
+    samples.push({ time: now, lost: lostSinceLast });
+
+    const windowStart = now - PACKET_LOSS_WINDOW_MS;
+    while (samples.length > 0 && samples[0].time < windowStart) {
+      samples.shift();
+    }
+
+    const recentPacketLoss = samples.reduce(
+      (total, sample) => total + sample.lost,
+      0,
+    );
+
+    setStats((prev) =>
+      prev.rtd === rtd &&
+      prev.packetLoss === packetLoss &&
+      prev.recentPacketLoss === recentPacketLoss
+        ? prev
+        : { rtd, packetLoss, recentPacketLoss },
+    );
   }, []);
 
-  const resetRtd = useCallback(() => {
-    setRtd(0);
+  const resetStats = useCallback(() => {
+    samplesRef.current = [];
+    lastPacketLossRef.current = null;
+    setStats(EMPTY_STATS);
   }, []);
 
-  return [rtd, recordRtd, resetRtd] as const;
+  return [stats, recordStats, resetStats] as const;
 }

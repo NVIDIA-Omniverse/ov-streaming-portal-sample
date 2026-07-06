@@ -1,11 +1,9 @@
-# Omniverse on DGX Cloud Portal Sample
+# Omniverse Streaming Portal Sample
 
-This repository provides the Web Portal Sample for Omniverse on DGX Cloud customers. 
-The Web Portal Sample allows developers to create, customize, and provide a front-end interface for launching Kit-based applications on Omniverse on DGX Cloud.  
+This repository provides the Web Portal Sample for Omniverse Streaming (Omniverse on DGX Cloud and Omniverse Streaming Self-Hosted) customers.
+The Web Portal Sample allows developers to create, customize, and provide a front-end interface for launching Kit-based applications.
 
 This repository also provides a sample of the Administrative panel that allows administrators to monitor and control user sessions.
-
-![component-diagram.png](docs/images/component-diagram.png)
 
 ## Governing Terms
 
