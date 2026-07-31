@@ -189,7 +189,7 @@ function AppStreamSession({ app, payload, resolution, sessionId }: StreamSession
     if (!auth.isAuthenticated) {
       void stream.terminate();
     }
-  }, [auth, stream]);
+  }, [auth.isAuthenticated, stream.terminate]);
 
   async function toggleFullScreen() {
     if (document.fullscreenElement) {
