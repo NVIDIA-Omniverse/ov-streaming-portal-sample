@@ -212,7 +212,13 @@ export default function useStream({
         if (message.status === EventStatus.SUCCESS) {
           const video = document.getElementById(
             videoElementId,
-          ) as HTMLVideoElement;
+          ) as HTMLVideoElement | null;
+
+          if (!video) {
+            setError(new Error(`Video element #${videoElementId} not found.`));
+            setLoading(false);
+            return;
+          }
 
           video.play().catch((error) => {
             setError(error as Error);
