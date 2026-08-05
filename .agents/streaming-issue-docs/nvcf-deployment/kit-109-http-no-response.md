@@ -44,7 +44,7 @@ Two failure modes were triaged under . The dominant one for Kit 109+ on OVC is *
 
 ### 1. NICLLS end-session polling → Kit shutdown (primary)
 
-Kit on NVCF runs with the **NICLLS** (Low Latency Streaming) sidecar. Each short-lived HTTP API call closes the proxy connection. NICLLS then polls Kit’s **`/v1/streaming/endsession`** endpoint for up to the **reconnect window** (default **5 minutes**; header `X-NVCF-RECONNECT-WINDOW-SECS` is **capped at 5 minutes** by NICLLS).
+Kit on NVCF runs with the **NICLLS** (Low Latency Streaming) sidecar. Each short-lived HTTP API call closes the proxy connection. NICLLS then polls Kit’s **`/v1/streaming/endsession`** endpoint for up to the **reconnect window** (default **5 minutes**; header `X-NVCF-RECONNECT-WINDOW-SECS` is **capped at 30 minutes (1800 s)** by NICLLS).
 
 | Step | Behavior |
 |------|----------|
@@ -137,7 +137,7 @@ Pick the row that matches your workload. Change **`NVDA_KIT_ARGS`** on the funct
 **Why two flags for HTTP automation**
 
 - **`resumeTimeoutSeconds=7200`** — Kit responds **`AWAITING_RESUME`** during NICLLS polling instead of ending the session at 30 s.
-- **`quitOnSessionEnded=false`** — When NICLLS eventually sends **`gracefulShutdown=true`** after the 5-minute reconnect cap, Kit **does not** call **`post_uncancellable_quit(0)`** and keeps serving HTTP.
+- **`quitOnSessionEnded=false`** — When NICLLS eventually sends **`gracefulShutdown=true`** after the 30-minute reconnect cap, Kit **does not** call **`post_uncancellable_quit(0)`** and keeps serving HTTP.
 
 For **portal streaming**, keep **`resumeTimeoutSeconds=300`** to align with portal idle timeout ([failed-stream-after-idle-reconnect.md](../portal-ui/failed-stream-after-idle-reconnect.md)). Do **not** set **`quitOnSessionEnded=false`** unless you intentionally want Kit to stay up after session end (automation-only pattern from RCA).
 
@@ -145,7 +145,7 @@ For **portal streaming**, keep **`resumeTimeoutSeconds=300`** to align with port
 
 1. **Wrong Kit arg path** — QA found tests passing **`--/exts/omni.services.livestream.session/resumeTimeoutSeconds=7200`** while Kit **109** automation expected **`--/app/livestream/nvcf/sessionResumeTimeoutSeconds=7200`** in one iteration; the **extension path** plus **`quitOnSessionEnded=false`** is the documented final RCA fix (correct Kit extension settings path).
 
-2. **Do not rely on reconnect header alone** — `X-NVCF-RECONNECT-WINDOW-SECS: 7200` is **silently capped at 300 s** in NICLLS; extend behavior via Kit args, not headers.
+2. **Do not rely on reconnect header alone** — `X-NVCF-RECONNECT-WINDOW-SECS: 7200` is **silently capped at 1800 s** in NICLLS; extend behavior via Kit args, not headers.
 
 3. **Starlette / automator crash** — If logs show the BackgroundTask **`TypeError`** on every request, treat as an extension bug path; session-arg fixes will not help until that crash is resolved or the automator version is updated.
 

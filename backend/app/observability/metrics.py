@@ -19,6 +19,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 import logging
+import os
+from collections.abc import Mapping
 
 import httpx
 import yaml
@@ -43,19 +45,25 @@ from pydantic.alias_generators import to_camel
 from app.models import SessionModel
 from app.settings import settings
 
-metric_exporter = OTLPMetricExporter(
-    preferred_temporality={
-        Counter: AggregationTemporality.CUMULATIVE,
-        UpDownCounter: AggregationTemporality.CUMULATIVE,
-        Histogram: AggregationTemporality.DELTA,
-    }
-)
-metric_reader = PeriodicExportingMetricReader(
-    exporter=metric_exporter,
+otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or os.getenv(
+    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
 )
 
+metric_readers = []
+if otlp_endpoint:
+    metric_exporter = OTLPMetricExporter(
+        preferred_temporality={
+            Counter: AggregationTemporality.CUMULATIVE,
+            UpDownCounter: AggregationTemporality.CUMULATIVE,
+            Histogram: AggregationTemporality.DELTA,
+        }
+    )
+    metric_readers.append(
+        PeriodicExportingMetricReader(exporter=metric_exporter)
+    )
+
 metrics_provider = MeterProvider(
-    metric_readers=[metric_reader],
+    metric_readers=metric_readers,
 )
 
 metrics.set_meter_provider(metrics_provider)
@@ -129,7 +137,9 @@ def get_total_gpus(options):
                 for cluster in gpu.clusters:
                     yield Observation(
                         cluster.limit,
-                        {"cluster": cluster.names, "gpu": gpu.name},
+                        attributes(
+                            {"cluster": cluster.names, "gpu": gpu.name}
+                        ),
                     )
 
 
@@ -211,12 +221,12 @@ def get_active_gpus(options):
                     for cluster in region.clusters:
                         yield Observation(
                             cluster.usage.active_gpus,
-                            {
+                            attributes({
                                 "gpu": gpu,
                                 "instance": instance.instance_name,
                                 "region": region.region_name,
                                 "cluster": cluster.cluster_name,
-                            },
+                            }),
                         )
 
 
@@ -229,13 +239,21 @@ gpu_active = meter.create_observable_gauge(
 
 
 def emit_session_end_metrics(session: SessionModel):
-    metric_attrs = {
+    metric_attrs = attributes({
         "session.app": session.app_id,
         "session.user": session.user_id,
         "session.username": session.user_name,
         "nvcf.function_id": str(session.function_id),
         "nvcf.function_version_id": str(session.function_version_id),
         "session.status": session.status,
-    }
+    })
     session_end.add(1, metric_attrs)
     session_duration.record(session.duration, metric_attrs)
+
+
+def attributes(attrs: Mapping) -> dict:
+    return {
+        key: value
+        for key, value in attrs.items()
+        if value is not None
+    }

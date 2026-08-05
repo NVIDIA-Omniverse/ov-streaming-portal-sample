@@ -10,6 +10,9 @@
     "lint": "tsc && eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
+  "overrides": {
+    "postcss": "^8.5.26"
+  },
   "dependencies": {
     "@mantine/core": "^7.17.8",
     "@mantine/hooks": "^7.17.8",
@@ -46,11 +49,11 @@
     "eslint-plugin-react": "^7.35.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
-    "postcss": "^8.4.38",
+    "postcss": "^8.5.26",
     "postcss-preset-mantine": "^1.15.0",
     "postcss-simple-vars": "^7.0.1",
     "prettier": "^3.3.2",
     "typescript": "^5.2.2",
-    "vite": "6.3.4"
+    "vite": "6.4.3"
   }
 }

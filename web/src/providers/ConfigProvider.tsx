@@ -43,6 +43,10 @@ const Config = z.object({
     // The URI of this application where the user will be redirected back after authentication.
     redirectUri: z.string().url(),
 
+    // The URI of this application where the user will be redirected back after the identity
+    // provider ends their session. Defaults to the home page of this application.
+    postLogoutRedirectUri: z.string().url().optional(),
+
     // The URI used for redirecting the user to the identity provider.
     authority: z.string().min(1, "Required"),
 

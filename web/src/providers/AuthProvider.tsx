@@ -31,6 +31,7 @@ import {
 } from "react-oidc-context";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useConfig } from "../hooks/useConfig";
+import { setReauthenticationRequired } from "../util/reauthentication";
 import { renewTokenWithLock } from "../util/tokenRenewal";
 
 export interface AuthProviderProps {
@@ -52,12 +53,14 @@ export default function AuthProvider({ children }: AuthProviderProps) {
   const [channel] = useState(() => new BroadcastChannel("session"));
 
   const onSignIn = useCallback(() => {
+    setReauthenticationRequired(false);
     setSearchParams({});
   }, [setSearchParams]);
 
   const onRemoveUser = useCallback(() => {
     Cookies.remove("id_token");
     Cookies.remove("access_token");
+    setReauthenticationRequired(true);
 
     channel.postMessage({ type: "logout" });
     navigate("/");
@@ -72,6 +75,8 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         client_id: config.auth.clientId,
         metadataUrl: config.auth.metadataUri,
         redirect_uri: config.auth.redirectUri,
+        post_logout_redirect_uri:
+          config.auth.postLogoutRedirectUri ?? homePageUri(),
         scope: config.auth.scope ?? "openid profile email",
 
         userStore: new WebStorageStateStore({
@@ -86,6 +91,7 @@ export default function AuthProvider({ children }: AuthProviderProps) {
     const listener = (event: MessageEvent) => {
       const message = event.data as AuthMessage;
       if (message.type === "logout") {
+        setReauthenticationRequired(true);
         void auth.userManager?.removeUser();
       } else {
         void auth.userManager?.getUser();
@@ -124,6 +130,10 @@ export default function AuthProvider({ children }: AuthProviderProps) {
       {children}
     </OIDCProvider>
   );
+}
+
+function homePageUri() {
+  return new URL("/", window.location.origin).href;
 }
 
 function CookieSync() {

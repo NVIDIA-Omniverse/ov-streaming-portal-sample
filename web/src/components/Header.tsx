@@ -31,6 +31,8 @@ import {
   Menu,
   Text,
 } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import useNucleusSession from "@omniverse/auth/react/hooks/NucleusSession";
 import {
   IconChevronDown,
@@ -41,11 +43,15 @@ import {
 import { useAuth } from "react-oidc-context";
 import { NavLink, useLocation } from "react-router-dom";
 import Logo from "../static/logo.png";
+import LogoutDialog from "./LogoutDialog";
 
 export default function Header() {
   const location = useLocation();
   const auth = useAuth();
   const nucleus = useNucleusSession();
+
+  const [logoutOpened, { open: openLogout, close: closeLogout }] =
+    useDisclosure(false);
 
   const givenName =
     auth.user?.profile.given_name ??
@@ -58,9 +64,34 @@ export default function Header() {
   const fullName = `${givenName} ${familyName}`;
   const initials = `${givenName.substring(0, 1)}${familyName.substring(0, 1)}`;
 
-  function logOut() {
-    void auth.removeUser();
-    nucleus.setSession(null);
+  /**
+   * Ends the portal session in all tabs and then ends the identity provider session,
+   * so that the identity provider asks the user for their credentials on the next login
+   * instead of signing them in again. Once their session is closed, the identity provider
+   * redirects the user back to the configured post logout redirect URI, which defaults to
+   * the home page.
+   *
+   * Called by the logout dialog after it carried out the choice of the user, because
+   * removing the user clears the authentication cookies that the session API requires.
+   */
+  async function logOut() {
+    const idToken = auth.user?.id_token;
+
+    try {
+      nucleus.setSession(null);
+      await auth.removeUser();
+      await auth.signoutRedirect({ id_token_hint: idToken });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : error?.toString?.() ?? "";
+
+      notifications.show({
+        title: "Failed to log out",
+        message,
+        color: "red",
+        autoClose: 20000,
+      });
+    }
   }
 
   return (
@@ -106,12 +137,18 @@ export default function Header() {
             >
               About
             </Menu.Item>
-            <Menu.Item leftSection={<IconLogout />} onClick={logOut}>
+            <Menu.Item leftSection={<IconLogout />} onClick={openLogout}>
               Log out
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
       </Flex>
+
+      <LogoutDialog
+        opened={logoutOpened}
+        onClose={closeLogout}
+        onLogOut={logOut}
+      />
     </Flex>
   );
 }

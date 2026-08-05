@@ -28,6 +28,7 @@ import httpx
 import pytest
 import uvicorn
 import websockets
+from fastapi import Response
 from freezegun import freeze_time
 from tortoise.signals import Signals
 from websockets.asyncio.client import connect
@@ -801,6 +802,81 @@ async def test_get_user_sessions(user_client, create_session, create_app):
     assert session_data["user_id"] == user_session.user_id
 
 
+async def test_get_own_sessions(user_client, create_session):
+    user_session = await create_session(status=SessionStatus.active)
+    await create_session(status=SessionStatus.active, user_id="other-user")
+
+    response = await user_client.get("/sessions", params={"own": "true"})
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_size"] == 1
+    assert data["items"][0]["id"] == user_session.id
+
+
+async def test_get_own_sessions_excludes_other_users_for_admin(
+    client, create_session
+):
+    admin_session = await create_session(status=SessionStatus.active)
+    other_session = await create_session(
+        status=SessionStatus.active, user_id="other-user"
+    )
+
+    response = await client.get("/sessions", params={"own": "true"})
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_size"] == 1
+    assert data["items"][0]["id"] == admin_session.id
+
+    # Administrators keep seeing sessions of all users without the flag.
+    response = await client.get("/sessions")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_size"] == 2
+    assert {item["id"] for item in data["items"]} == {
+        admin_session.id,
+        other_session.id,
+    }
+
+
+async def test_get_own_alive_sessions(client, create_session):
+    idle_session = await create_session(status=SessionStatus.idle)
+    await create_session(status=SessionStatus.stopped)
+    await create_session(status=SessionStatus.active, user_id="other-user")
+
+    response = await client.get(
+        "/sessions",
+        params={"own": "true", "status": SessionStatus.alive.value},
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_size"] == 1
+    assert data["items"][0]["id"] == idle_session.id
+
+
+async def test_get_own_sessions_filtered_by_app(client, create_session, create_app):
+    app = await create_app()
+
+    app_session = await create_session(status=SessionStatus.active, app=app)
+    await create_session(status=SessionStatus.active)
+    await create_session(
+        status=SessionStatus.active, app=app, user_id="other-user"
+    )
+
+    response = await client.get(
+        "/sessions",
+        params={"own": "true", "app_id": str(app.id)},
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_size"] == 1
+    assert data["items"][0]["id"] == app_session.id
+
+
 async def test_get_sessions_filtered_by_status(client, create_session):
     await create_session(status=SessionStatus.stopped)
     await create_session(status=SessionStatus.connecting)
@@ -1045,7 +1121,7 @@ async def test_terminate_session(
                     connected.set()
                     await ws.recv()
             assert err.value.rcvd.code == 3010
-            assert err.value.rcvd.reason == "Terminated by a system administrator."
+            assert err.value.rcvd.reason == "Terminated by the user."
 
     task = asyncio.create_task(send())
     await asyncio.wait_for(connected.wait(), 5)
@@ -1236,6 +1312,30 @@ async def test_session_timeout_with_error_is_failed(
     )
     assert timed_out.status == SessionStatus.failed
     assert timed_out.error == "DataChannel closed unexpectedly."
+
+
+@pytest.mark.parametrize(
+    "user_id, expected_reason",
+    [
+        ("omniverse", "Terminated by the user."),
+        ("other-user", "Terminated by a system administrator."),
+    ],
+)
+async def test_terminate_session_reason_depends_on_ownership(
+    client, create_session, mocker, user_id, expected_reason
+):
+    """The reason reaches users as the websocket close reason, so a session
+    that users end themselves must not be reported as an administrator action.
+    """
+    end_session = mocker.patch("app.routers.sessions.end_session")
+    end_session.return_value = Response(status_code=204)
+
+    session = await create_session(status=SessionStatus.active, user_id=user_id)
+
+    response = await client.delete(f"/sessions/{session.id}")
+    assert response.status_code == 204
+
+    assert end_session.await_args.kwargs["reason"] == expected_reason
 
 
 async def test_terminate_session_is_unauthorized_for_anonymous_user(client):

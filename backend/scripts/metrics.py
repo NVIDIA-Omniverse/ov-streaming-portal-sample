@@ -21,29 +21,31 @@
 
 import os
 import asyncio
-from app.observability.metrics import (
-    active_sessions,
-    session_start,
-    session_end,
-)
 
 
 async def test_metrics():
+    # Imported here so the OTLP endpoint is set before the exporter is created.
+    from app.observability import metrics
+
     print("Testing OpenTelemetry metrics...")
+    test_attrs = metrics.attributes({
+        "user_id": "test-user",
+        "app_id": "test-app",
+    })
 
     print("Recording session start...")
-    session_start.add(1, {"user_id": "test-user", "app_id": "test-app"})
+    metrics.session_start.add(1, test_attrs)
 
     print("Incrementing active sessions...")
-    active_sessions.add(1, {"user_id": "test-user", "app_id": "test-app"})
+    metrics.active_sessions.add(1, test_attrs)
 
     await asyncio.sleep(2)
 
     print("Recording session end...")
-    session_end.add(1, {"user_id": "test-user", "app_id": "test-app"})
+    metrics.session_end.add(1, test_attrs)
 
     print("Decrementing active sessions...")
-    active_sessions.add(-1, {"user_id": "test-user", "app_id": "test-app"})
+    metrics.active_sessions.add(-1, test_attrs)
 
     print("Metrics recorded. Check your collector/backend for the data.")
     print("Waiting 10 seconds to ensure export...")

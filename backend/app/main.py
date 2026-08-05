@@ -108,6 +108,7 @@ api = FastAPI(
     lifespan=configure_api,
     root_path=settings.root_path,
     docs_url="/",
+    strict_content_type=False,
 )
 
 api.add_middleware(

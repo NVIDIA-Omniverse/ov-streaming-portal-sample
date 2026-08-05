@@ -21,6 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+import { parallel } from "radash";
 import { z } from "zod";
 import { Config } from "../providers/ConfigProvider";
 import { HttpError } from "../util/Errors";
@@ -83,9 +84,52 @@ export type StreamingSessionPage = z.infer<typeof StreamingSessionPage>;
 export interface GetSessionsParams {
   config: Config;
   page?: number;
+  pageSize?: number;
   status?: string;
   appId?: string;
   orderBy?: string;
+
+  /**
+   * Restricts the result to the sessions of the current user.
+   * Administrators see sessions of all users unless this is set.
+   */
+  own?: boolean;
+}
+
+const OWN_SESSIONS_PAGE_SIZE = 100;
+
+export interface GetOwnAliveSessionsParams {
+  config: Config;
+}
+
+/**
+ * Returns every running session of the current user across all applications.
+ * Administrators get their own sessions only, never the sessions of other users.
+ *
+ * @param config The application configuration retrieved from /config.json path.
+ */
+export async function getOwnAliveSessions({
+  config,
+}: GetOwnAliveSessionsParams): Promise<StreamingSession[]> {
+  const sessions: StreamingSession[] = [];
+
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const result = await getSessions({
+      config,
+      own: true,
+      page,
+      pageSize: OWN_SESSIONS_PAGE_SIZE,
+      status: "ALIVE",
+    });
+
+    sessions.push(...result.items);
+    totalPages = result.totalPages;
+    page += 1;
+  } while (page <= totalPages);
+
+  return sessions;
 }
 
 /**
@@ -101,13 +145,18 @@ export interface GetSessionsParams {
 export async function getSessions({
   config,
   page,
+  pageSize,
   status,
   appId,
   orderBy,
+  own,
 }: GetSessionsParams): Promise<StreamingSessionPage> {
   const params = new URLSearchParams();
   if (page) {
     params.set("page", page.toString());
+  }
+  if (pageSize) {
+    params.set("page_size", pageSize.toString());
   }
   if (status) {
     params.set("status", status.toUpperCase());
@@ -117,6 +166,9 @@ export async function getSessions({
   }
   if (orderBy) {
     params.set("order_by", orderBy);
+  }
+  if (own) {
+    params.set("own", "true");
   }
 
   const response = await fetch(
@@ -186,6 +238,49 @@ export async function startSession({
     `Failed to start a streaming session -- HTTP${response.status}.\n${text}`,
     response.status,
   );
+}
+
+/**
+ * How many sessions are terminated at the same time. Keeps a user with an
+ * unusually large number of running sessions from opening a request per session
+ * all at once.
+ */
+const TERMINATION_CONCURRENCY = 5;
+
+export type SessionTerminationState = "terminating" | "terminated" | "failed";
+
+export interface SessionTerminationProgress {
+  state: SessionTerminationState;
+  error?: string;
+}
+
+export interface TerminateOwnSessionsParams {
+  config: Config;
+  sessions: StreamingSession[];
+  onProgress: (sessionId: string, progress: SessionTerminationProgress) => void;
+}
+
+/**
+ * Terminates the specified sessions and reports the outcome of every session
+ * through `onProgress` as soon as it is known. A session that cannot be
+ * terminated does not stop the remaining ones.
+ */
+export async function terminateOwnSessions({
+  config,
+  sessions,
+  onProgress,
+}: TerminateOwnSessionsParams): Promise<void> {
+  await parallel(TERMINATION_CONCURRENCY, sessions, async (session) => {
+    try {
+      await terminateSession({ config, sessionId: session.id });
+      onProgress(session.id, { state: "terminated" });
+    } catch (error) {
+      onProgress(session.id, {
+        state: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
 }
 
 export interface TerminateSessionParams {

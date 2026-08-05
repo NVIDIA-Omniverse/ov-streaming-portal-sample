@@ -26,6 +26,7 @@ import Cookies from "js-cookie";
 import { ReactNode, useEffect, useState } from "react";
 import { hasAuthParams, useAuth } from "react-oidc-context";
 import { useLocation } from "react-router-dom";
+import { isReauthenticationRequired } from "../util/reauthentication";
 
 export interface AuthRequiredProps {
   children?: ReactNode;
@@ -55,16 +56,22 @@ export default function AuthRequired({ children }: AuthRequiredProps) {
       !auth.isLoading &&
       !hasTriedSignIn
     ) {
+      const redirectTo = `${location.pathname}${location.search}`;
+      const state: AuthState = { redirectTo };
+
+      setHasTriedSignIn(true);
+
+      if (isReauthenticationRequired()) {
+        void auth.signinRedirect({ state, prompt: "login" });
+        return;
+      }
+
       const handleError = (error: Error) => {
         console.error(error);
       };
 
       auth.events.addSilentRenewError(handleError);
 
-      setHasTriedSignIn(true);
-
-      const redirectTo = `${location.pathname}${location.search}`;
-      const state: AuthState = { redirectTo };
       void auth
         .signinSilent({ state })
         .then((user) => {

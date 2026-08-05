@@ -17,6 +17,9 @@ Create the `main.json` file in the `web/public/config` directory with the follow
 * Specify the Identity Provider URL in the `authority` value
 * Specify the client ID of this application registered in the Identity Provider in the `clientId` value
 * Replace the `nucleus` value with the fully qualified hostname of your Enterprise Nucleus Server (do not include `https://`)
+* Register the `postLogoutRedirectUri` value in the Identity Provider as a post logout redirect URI.
+  Logging out ends the session on the Identity Provider so that users must authenticate again,
+  and the Identity Provider redirects them back to this URI. Defaults to the portal home page.
 
 ```json
 {
@@ -24,6 +27,7 @@ Create the `main.json` file in the `web/public/config` directory with the follow
     "authority": "...",
     "clientId": "...",
     "redirectUri": "http://localhost:3180/openid",
+    "postLogoutRedirectUri": "http://localhost:3180/",
     "scope": "openid profile email authz"
   },
   "endpoints": {

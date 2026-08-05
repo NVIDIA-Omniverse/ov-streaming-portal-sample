@@ -12,6 +12,9 @@ data:
         "authority": {{ .Values.config.auth.authority | toJson }},
         "metadataUri": {{ .Values.config.auth.metadataUri | toJson }},
         "redirectUri": {{ .Values.config.auth.redirectUri | toJson }},
+{{- if .Values.config.auth.postLogoutRedirectUri }}
+        "postLogoutRedirectUri": {{ .Values.config.auth.postLogoutRedirectUri | toJson }},
+{{- end }}
         "scope": {{ .Values.config.auth.scope | toJson }}
       },
       "endpoints": {

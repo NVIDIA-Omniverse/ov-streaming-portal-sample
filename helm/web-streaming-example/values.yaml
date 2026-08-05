@@ -68,6 +68,12 @@ config:
     # This is the URL used for the example. Must end with /openid
     redirectUri: "https://ovc-sample:3180/openid"
 
+    # The Customer Web App URL where the IdP must redirect the user back after it ends
+    # the user session, usually the home page of the portal.
+    # Must be registered in the IdP as a post logout redirect URI.
+    # When left empty, the home page of the portal is used.
+    postLogoutRedirectUri: ""
+
     # The identity provider URL (where users will be redirected for authentication)
     authority: ""
 
@@ -169,7 +175,7 @@ config:
   # You MUST make sure the value matches the timeout you specified during the NVCF function creation.
   # Only one global timeout is supported on the portal side,
   # therefore all NVCF functions should be created with the same session resume timeout matching the value below.
-  # The specified value must be less or equal 300 seconds (5 minutes) which is the maximum NVCF session reconnect timeout.
+  # The specified value must be less or equal 1800 seconds (30 minutes) which is the maximum NVCF session reconnect timeout.
   sessionIdleTimeout: 300
 
   # Number of days to retain stopped session data before automatic purging.

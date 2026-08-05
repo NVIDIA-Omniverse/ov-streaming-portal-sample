@@ -283,7 +283,11 @@ async def start_stream(
             "Function-Version-ID": str(app.function_version_id),
 
             # Required NVCF header for starting a streaming session
-            "X-NVCF-ABSORB": "true"
+            "X-NVCF-ABSORB": "true",
+
+            # How long the control plane waits after a disconnect
+            # before terminating the session
+            "X-NVCF-RECONNECT-WINDOW-SECS": str(settings.session_idle_timeout),
         }
 
         try:
@@ -317,13 +321,13 @@ async def start_stream(
 
                 response = Response(content=content, status_code=response.status_code)
                 if response.status_code == status.HTTP_200_OK:
-                    metrics.session_start.add(1, {
+                    metrics.session_start.add(1, metrics.attributes({
                         "session.app": session_model.app_id,
                         "session.user": user.sub,
                         "session.username": user.username,
                         "nvcf.function_id": str(app.function_id),
                         "nvcf.function_version_id": str(app.function_version_id),
-                    })
+                    }))
 
                     api_cookies = http.cookies.SimpleCookie()
                     api_cookies["nvcf-request-id"] = nvcf_request_id.value
@@ -583,6 +587,10 @@ async def connect_to_stream(
 
             # Specify the streaming session ID in cookies
             "Cookie": f"nvcf-request-id={nvcf_request_id}",
+
+            # How long the control plane waits after a disconnect
+            # before terminating the session
+            "X-NVCF-RECONNECT-WINDOW-SECS": str(settings.session_idle_timeout),
         }
 
         logger.debug(f"[{session.id}] WebSocket cookies: {websocket.cookies}")
@@ -607,13 +615,13 @@ async def connect_to_stream(
             session.status = SessionStatus.active
             await session.save(update_fields=["status"])
 
-            metrics.active_sessions.add(1, {
+            metrics.active_sessions.add(1, metrics.attributes({
                 "session.app": session.app_id,
                 "session.user": user.sub,
                 "session.username": user.username,
                 "nvcf.function_id": str(app.function_id),
                 "nvcf.function_version_id": str(app.function_version_id),
-            })
+            }))
 
             async def consumer():
                 """
@@ -693,13 +701,13 @@ async def connect_to_stream(
         logger.info(f"[{session.id}] Closed with code {code}{reason_msg}.")
 
         if session.status == SessionStatus.active:
-            metrics.active_sessions.add(-1, {
+            metrics.active_sessions.add(-1, metrics.attributes({
                 "session.app": session.app_id,
                 "session.user": user.sub,
                 "session.username": user.username,
                 "nvcf.function_id": str(app.function_id),
                 "nvcf.function_version_id": str(app.function_version_id),
-            })
+            }))
 
         if upstream_failed:
             # Upstream (NVCF / streaming application) closed the connection
@@ -795,6 +803,7 @@ async def get_sessions(
     user: Annotated[User, Depends(authenticated_only)],
     filtered_status: Annotated[SessionStatus, Query(alias="status")] = None,
     filtered_app: Annotated[str, Query(alias="app_id")] = None,
+    own: Annotated[bool, Query()] = False,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=5)] = 25,
     order_by: Annotated[str, Query()] = "-start_date",
@@ -826,8 +835,9 @@ async def get_sessions(
     if filtered_app:
         queryset = queryset.filter(app=filtered_app)
 
-    if not await user.is_admin():
+    if own or not await user.is_admin():
         # Regular users can only see their own sessions.
+        # Administrators opt into the same scope by passing `own`.
         queryset = queryset.filter(user_id=user.sub)
 
     total_size = await queryset.count()
@@ -930,9 +940,14 @@ async def terminate_session(
             status_code=status.HTTP_204_NO_CONTENT,
             headers=set_session_expired_cookies(),
         )
+    reason = (
+        "Terminated by the user."
+        if session.user_id == user.sub
+        else "Terminated by a system administrator."
+    )
     return await end_session(
         session,
-        reason="Terminated by a system administrator.",
+        reason=reason,
         final_status=SessionStatus.stopped,
     )
 

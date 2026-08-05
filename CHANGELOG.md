@@ -1,8 +1,19 @@
 # Omniverse Streaming Portal Sample Changelog
 
+## Version 1.6.1 - August 2026
+
+- Send NVCF reconnect window header and document 1800s maximum limit
+- End the identity provider session when users log out so they are asked to authenticate again instead of being signed back in, and redirect them to the home page
+- Ask users on log out whether to keep their streaming sessions running or end them all, reporting the outcome of every session that is ended
+  - Note: System administrators can only end their own sessions
+- Added an `own` query parameter to `GET /sessions/` that restricts the result to the sessions of the current user, which system administrators can use to exclude sessions of other users
+- Report sessions that users end themselves as terminated by the user instead of by a system administrator
+- Update FastAPI, Starlette, cryptography, and mcp to address known CVEs
+- Skip OTLP export when non-configured and omit `None` metric attributes
+
 ## Version 1.6.0 - July 2026
 
-- Renamed to Omniverse Streaming Portal Sample to reflect its expanded compatibility with Omniverse Streaming Self-Hosted.
+- Renamed to Omniverse Streaming Portal Sample to reflect its expanded compatibility with Omniverse Streaming Self-Hosted
 - Include sample NavVis integration files
 - Encode page name in the sidebar link to fix pages with plus (+) sign character
 - Show packet loss in stream latency indicator popup
