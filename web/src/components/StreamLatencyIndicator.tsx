@@ -92,7 +92,7 @@ export function StreamLatencyIndicator({
   );
 }
 
-function getIndicatorColor(rtd: number) {
+export function getIndicatorColor(rtd: number) {
   if (rtd <= 80) {
     return "#76b900";
   }
