@@ -56,34 +56,34 @@ export function StreamLatencyIndicator({
 
   const color = getIndicatorColor(rtd);
   return (
-    <Flex style={style} align={"center"} gap={"xs"}>
-      <Text size={"xs"}>Connection Latency:</Text>
-      <HoverCard position={"top"} withArrow shadow={"md"} openDelay={0}>
+    <Flex style={style} align="center" gap="xs">
+      <Text size="xs">Connection Latency:</Text>
+      <HoverCard position="top" withArrow shadow="md" openDelay={0}>
         <HoverCard.Target>
           <IconCircleFilled color={color} size={16} />
         </HoverCard.Target>
         <HoverCard.Dropdown>
           <Stack gap={4}>
-            <Text size={"sm"} fw={600}>
+            <Text size="sm" fw={600}>
               Connection Stats
             </Text>
-            <Group justify={"space-between"} gap={"lg"}>
-              <Text size={"xs"} c={"dimmed"}>
+            <Group justify="space-between" gap="lg">
+              <Text size="xs" c="dimmed">
                 Round trip delay
               </Text>
-              <Text size={"xs"}>{rtd}ms</Text>
+              <Text size="xs">{rtd}ms</Text>
             </Group>
-            <Group justify={"space-between"} gap={"lg"}>
-              <Text size={"xs"} c={"dimmed"}>
+            <Group justify="space-between" gap="lg">
+              <Text size="xs" c="dimmed">
                 Packets lost (last 3 min)
               </Text>
-              <Text size={"xs"}>{recentPacketLoss}</Text>
+              <Text size="xs">{recentPacketLoss}</Text>
             </Group>
-            <Group justify={"space-between"} gap={"lg"}>
-              <Text size={"xs"} c={"dimmed"}>
+            <Group justify="space-between" gap="lg">
+              <Text size="xs" c="dimmed">
                 Packets lost (total)
               </Text>
-              <Text size={"xs"}>{packetLoss}</Text>
+              <Text size="xs">{packetLoss}</Text>
             </Group>
           </Stack>
         </HoverCard.Dropdown>
