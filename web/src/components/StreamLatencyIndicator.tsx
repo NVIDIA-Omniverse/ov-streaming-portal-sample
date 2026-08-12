@@ -25,6 +25,21 @@ import { IconCircleFilled } from "@tabler/icons-react";
 import { Flex, Group, HoverCard, Stack, Text } from "@mantine/core";
 import { CSSProperties } from "react";
 
+/** Threshold (ms) below which latency is considered good. */
+const LATENCY_GOOD_THRESHOLD_MS = 80;
+
+/** Threshold (ms) below which latency is considered acceptable/warning. */
+const LATENCY_WARNING_THRESHOLD_MS = 200;
+
+/** Color used to indicate good latency. */
+const LATENCY_GOOD_COLOR = "#76b900";
+
+/** Color used to indicate warning latency. */
+const LATENCY_WARNING_COLOR = "#ffa903";
+
+/** Color used to indicate critical latency. */
+const LATENCY_CRITICAL_COLOR = "#f21616";
+
 export interface StreamLatencyIndicatorProps {
   /**
    * Round trip delay in milliseconds.
@@ -92,12 +107,17 @@ export function StreamLatencyIndicator({
   );
 }
 
-function getIndicatorColor(rtd: number) {
-  if (rtd <= 80) {
-    return "#76b900";
+/**
+ * Returns the indicator color for a given round-trip delay.
+ *
+ * @param rtd Round-trip delay in milliseconds.
+ */
+export function getIndicatorColor(rtd: number) {
+  if (rtd <= LATENCY_GOOD_THRESHOLD_MS) {
+    return LATENCY_GOOD_COLOR;
   }
-  if (rtd <= 200) {
-    return "#ffa903";
+  if (rtd <= LATENCY_WARNING_THRESHOLD_MS) {
+    return LATENCY_WARNING_COLOR;
   }
-  return "#f21616";
+  return LATENCY_CRITICAL_COLOR;
 }
