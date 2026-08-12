@@ -66,6 +66,10 @@ export function useLatencyIndicator() {
     }
 
     const { rtd, packetLoss } = nextStats;
+    if (!Number.isFinite(rtd) || !Number.isFinite(packetLoss)) {
+      return;
+    }
+
     const now = Date.now();
     const previousPacketLoss = lastPacketLossRef.current;
     lastPacketLossRef.current = packetLoss;
