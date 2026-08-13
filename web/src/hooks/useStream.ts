@@ -209,6 +209,7 @@ export default function useStream({
           } catch (error) {
             setError(error as Error);
             setLoading(false);
+            return;
           }
         }
 
