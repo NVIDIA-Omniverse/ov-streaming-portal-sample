@@ -46,7 +46,7 @@ export default function ApplicationPages({
           component={Link}
           active={selectedPage ? selectedPage === page : index === 0}
           className={classes.applicationPage}
-          color={"gray"}
+          color="gray"
           label={page}
           to={{ search: `?page=${encodeURIComponent(page)}` }}
           title={page}
