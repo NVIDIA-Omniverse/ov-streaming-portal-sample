@@ -210,14 +210,14 @@ export default function useStream({
 
       if (message.action === EventAction.START) {
         if (message.status === EventStatus.SUCCESS) {
-          const video = document.getElementById(
-            videoElementId,
-          ) as HTMLVideoElement;
+          const video = document.getElementById(videoElementId);
 
-          video.play().catch((error) => {
-            setError(error as Error);
-          });
-          video.focus();
+          if (video instanceof HTMLVideoElement) {
+            video.play().catch((error) => {
+              setError(error as Error);
+            });
+            video.focus();
+          }
 
           setLoading(false);
           hideNotification(streamStartNotification);
