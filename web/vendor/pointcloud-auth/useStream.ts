@@ -280,20 +280,25 @@ export default function useStream({
         } else {
           const data_json = localStorage.getItem(key);
           if (data_json != null) {
-            const data = JSON.parse(data_json);
-            if (
-              typeof data === "object" &&
-              data !== null &&
-              "expiration_time" in data
-            ) {
-              const now = Date.now() / 1000; // seconds since epoch
+            try {
+              const data = JSON.parse(data_json);
               if (
-                typeof data.expiration_time === "number" &&
-                now >= data.expiration_time
+                typeof data === "object" &&
+                data !== null &&
+                "expiration_time" in data
               ) {
-                console.info("Removing expired storage entry '" + key + "'");
-                localStorage.removeItem(key);
+                const now = Date.now() / 1000; // seconds since epoch
+                if (
+                  typeof data.expiration_time === "number" &&
+                  now >= data.expiration_time
+                ) {
+                  console.info("Removing expired storage entry '" + key + "'");
+                  localStorage.removeItem(key);
+                }
               }
+            } catch {
+              console.warn("Removing unreadable storage entry '" + key + "'");
+              localStorage.removeItem(key);
             }
           }
         }
